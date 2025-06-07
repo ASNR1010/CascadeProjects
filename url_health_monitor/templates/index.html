@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>URL Health Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script>
+        // Check if Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            document.write('<div style="color: red; margin: 20px;">Error: Chart.js failed to load. Please refresh the page.</div>');
+        }
+    </script>
+</head>
+<body>
+    <h2>URL Health Monitor</h2>
+    <form id="urlForm">
+        <textarea id="urls" rows="5" cols="50" placeholder="Enter URLs, one per line"></textarea><br>
+        <button type="submit">Check URLs</button>
+    </form>
+    <h3>Results</h3>
+    <table border="1" id="resultsTable">
+        <tr><th>URL</th><th>Status</th><th>Response Time (ms)</th></tr>
+    </table>
+    <h3>Recent History (last 20 checks)</h3>
+    <table border="1" id="historyTable">
+        <tr><th>URL</th><th>Status</th><th>Response Time (ms)</th><th>Checked At</th></tr>
+    </table>
+    <script>
+        document.getElementById('urlForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const urls = document.getElementById('urls').value.split('\n').filter(Boolean);
+            const res = await fetch('/check', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({urls: urls})
+            });
+            const data = await res.json();
+            const table = document.getElementById('resultsTable');
+            table.innerHTML = '<tr><th>URL</th><th>Status</th><th>Response Time (ms)</th></tr>';
+            data.forEach(row => {
+                table.innerHTML += `<tr>
+                    <td>${row.url}</td>
+                    <td>${row.status}</td>
+                    <td>${row.response_time}</td>
+                </tr>`;
+            });
+            loadHistory();
+        };
+
+        async function loadHistory() {
+            const res = await fetch('/history');
+            const data = await res.json();
+            const table = document.getElementById('historyTable');
+            table.innerHTML = '<tr><th>URL</th><th>Status</th><th>Response Time (ms)</th><th>Checked At</th></tr>';
+            data.forEach(row => {
+                table.innerHTML += `<tr>
+                    <td>${row.url}</td>
+                    <td>${row.status}</td>
+                    <td>${row.response_time}</td>
+                    <td>${row.checked_at}</td>
+                </tr>`;
+            });
+        }
+        loadHistory();
+    </script>
+    <!-- Chart Section -->
+<div class="chart-container">
+    <h3>Uptime and Response Time Chart</h3>
+    <canvas id="uptimeChart"></canvas>
+    <div id="chartError" style="display: none; color: red; margin-top: 10px;"></div>
+</div>
+
+<script>
+// Initialize Chart.js
+async function loadChartData() {
+    try {
+        // Check if Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            throw new Error('Chart.js not loaded');
+        }
+
+        // First check if we have any data in the database
+        const res = await fetch('/chart-data');
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const rawData = await res.json();
+        if (!Array.isArray(rawData) || rawData.length === 0) {
+            document.getElementById('chartError').textContent = 'No data available yet. Please check some URLs first.';
+            document.getElementById('chartError').style.display = 'block';
+            return;
+        }
+
+        // Prepare datasets
+        const labels = rawData.map(row => row.x);
+        const uptimeData = rawData.map(row => row.y);
+        const responseTimeData = rawData.map(row => row.response_time);
+
+        // Get chart context
+        const ctx = document.getElementById('uptimeChart');
+        if (!ctx) {
+            throw new Error('Canvas element not found');
+        }
+        
+        // Create chart
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Uptime',
+                        data: uptimeData,
+                        borderColor: '#4BB543',
+                        backgroundColor: 'rgba(75,181,67,0.1)',
+                        yAxisID: 'y',
+                        stepped: true,
+                        fill: false,
+                        pointRadius: 4,
+                        pointBackgroundColor: uptimeData.map(v => v ? '#4BB543' : '#FF0000'),
+                        showLine: true
+                    },
+                    {
+                        label: 'Response Time (ms)',
+                        data: responseTimeData,
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0,123,255,0.1)',
+                        yAxisID: 'y1',
+                        fill: false,
+                        pointRadius: 2,
+                        borderDash: [5,5]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            tooltipFormat: 'YYYY-MM-DD HH:mm:ss',
+                            displayFormats: {
+                                minute: 'HH:mm:ss'
+                            }
+                        },
+                        title: { display: true, text: 'Timestamp' }
+                    },
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        min: 0,
+                        max: 1,
+                        ticks: {
+                            callback: function(value) {
+                                return value === 1 ? 'UP' : 'DOWN';
+                            }
+                        },
+                        title: { display: true, text: 'Uptime' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'Response Time (ms)' },
+                        grid: { drawOnChartArea: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: true },
+                    title: {
+                        display: true,
+                        text: 'URL Health Monitoring'
+                    }
+                }
+            }
+        });
+        
+        // Hide error message if it was shown
+        document.getElementById('chartError').style.display = 'none';
+    } catch (error) {
+        console.error('Error loading chart data:', error);
+        document.getElementById('chartError').textContent = `Error: ${error.message}`;
+        document.getElementById('chartError').style.display = 'block';
+    }
+}
+
+// Load chart when page loads
+window.addEventListener('load', loadChartData);
+
+// Update chart every 30 seconds
+//setInterval(loadChartData, 30000);
+</script>
+  
+</body>
+</html>
