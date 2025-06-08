@@ -4,9 +4,12 @@ A web-based tool to monitor the health of multiple URLs. Built using **Flask** a
 
 ---
 
-##  Screenshot
+## Website Screenshots
 
-![Website Snapshot](./url_health_monitor/Capture.PNG)
+![Website Snapshot](./url_health_monitor/images/website_snapshot.PNG)
+
+![Chart](./url_health_monitor/images/Website_chart.PNG)
+
 
 ---
 
@@ -35,7 +38,7 @@ url_health_monitor/
 
 ---
 
-## 🧰 Tech Stack
+## Tech Stack
 
 - Python 3.8+
 - Flask
