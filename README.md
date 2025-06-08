@@ -6,7 +6,7 @@ A web-based tool to monitor the health of multiple URLs. Built using **Flask** a
 
 ##  Screenshot
 
-> Insert a screenshot here if available (e.g. `static/screenshot.png`)
+![Website Snapshot](./url_health_monitor/Capture.PNG)
 
 ---
 
