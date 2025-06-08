@@ -1,4 +1,4 @@
-# URL Health Monitor (Flask + SQLite)
+# URL Health Monitor
 
 A web-based tool to monitor the health of multiple URLs. Built using **Flask** and **SQLite**, this app checks if websites are **UP or DOWN**, tracks **response time**, and stores results in a local database.
 
